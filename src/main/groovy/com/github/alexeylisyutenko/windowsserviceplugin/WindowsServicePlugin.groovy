@@ -33,7 +33,7 @@ class WindowsServicePlugin implements Plugin<Project> {
     /**
      * The apache commons daemon artifact version.
      */
-    static final String COMMONS_DAEMON_BIN_ARTIFACT_VERSION = '1.1.0'
+    static final String COMMONS_DAEMON_BIN_ARTIFACT_VERSION = '1.4.1'
 
     @Override
     void apply(Project project) {
@@ -44,20 +44,16 @@ class WindowsServicePlugin implements Plugin<Project> {
         Configuration binaryConfig = project.configurations.create(COMMONS_DAEMON_BIN_CONFIGURATION_NAME).setVisible(false)
                 .setTransitive(false).setDescription('The apache commons daemon configuration for this project.')
 
-        // Configure repository for obtaining the apache commons daemon windows binaries.
-        if (project.repositories.isEmpty()) {
-            project.logger.debug('Adding the maven central repository to retrieve the apache commons daemon windows binaries.')
-            project.repositories.mavenCentral()
-        }
-
         // Configure dependencies to apache commons daemon windows binaries.
         def commonsDaemonArtifact = "commons-daemon:commons-daemon:${COMMONS_DAEMON_BIN_ARTIFACT_VERSION}:bin-windows@zip"
         Dependency dependency = project.dependencies.create(commonsDaemonArtifact)
         binaryConfig.dependencies.add(dependency)
 
         // Configure tasks.
-        project.task(CREATE_WINDOWS_SERVICE_TASK_NAME, type: WindowsServicePluginTask,
-                group: PLUGIN_GROUP, description: 'Creates a distribution of the program as a windows service application')
+        var task = project.tasks.register(CREATE_WINDOWS_SERVICE_TASK_NAME, WindowsServicePluginTask) {
+            group = PLUGIN_GROUP
+            description = 'Creates a distribution of the program as a windows service application'
+        }
     }
 
 }

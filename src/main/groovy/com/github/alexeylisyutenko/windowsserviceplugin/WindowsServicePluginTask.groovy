@@ -6,7 +6,10 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.FileCollection
 import org.gradle.api.plugins.JavaPlugin
+import org.gradle.api.provider.Property
 import org.gradle.api.tasks.*
+
+import javax.inject.Inject
 
 /**
  * The main plugin's task that creates a windows service distribution.
@@ -14,16 +17,6 @@ import org.gradle.api.tasks.*
  * Created by Алексей Лисютенко on 28.02.2017.
  */
 class WindowsServicePluginTask extends DefaultTask {
-
-    /**
-     * Plugin configuration for current project.
-     */
-    @Nested
-    private WindowsServicePluginConfiguration configuration
-
-    WindowsServicePluginConfiguration getConfiguration() {
-        configuration
-    }
 
     /**
      * Classpath automatically obtained from the jar task.
@@ -36,7 +29,7 @@ class WindowsServicePluginTask extends DefaultTask {
      */
     @InputFiles
     FileCollection getClasspath() {
-        configuration.overridingClasspath ?: automaticClasspath
+        !project.extensions.getByName(WindowsServicePlugin.EXTENSION_NAME).overridingClasspath.isEmpty() ? project.extensions.getByName(WindowsServicePlugin.EXTENSION_NAME).overridingClasspath : automaticClasspath
     }
 
     /**
@@ -44,30 +37,26 @@ class WindowsServicePluginTask extends DefaultTask {
      */
     @OutputDirectory
     File getOutputDirectory() {
-        project.file("${project.buildDir}/${configuration.outputDir}")
+        project.file("${project.buildDir}/${project.extensions.getByName(WindowsServicePlugin.EXTENSION_NAME).outputDir.getOrNull()}")
     }
 
     WindowsServicePluginTask() {
-        this.configuration = project.getConvention().getByType(WindowsServicePluginConfiguration.class)
 
         // Apply Java gradle plugin.
         project.pluginManager.apply(JavaPlugin.class)
 
         // Make this task depended on the jar task.
-        dependsOn.add(project.tasks[JavaPlugin.JAR_TASK_NAME])
-
-        // Populate classpath with jar task outputs and runtime dependencies.
-        project.afterEvaluate {
-            automaticClasspath = automaticClasspath + project.files(project.tasks[JavaPlugin.JAR_TASK_NAME])
-            automaticClasspath = automaticClasspath + project.configurations[JavaPlugin.RUNTIME_CONFIGURATION_NAME]
-        }
+        dependsOn.add(project.tasks.named(JavaPlugin.JAR_TASK_NAME))
     }
 
     @TaskAction
     void run() {
+        def configuration = project.extensions.getByName(WindowsServicePlugin.EXTENSION_NAME)
+        automaticClasspath = automaticClasspath + project.files(project.tasks.named(JavaPlugin.JAR_TASK_NAME))
+        automaticClasspath = automaticClasspath + project.configurations.getByName(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME)
         // There is no precompiled Intel Itanium 64-bit executable of Procrun in a maven artifact since a version 1.1.0 of
         // Apache Commons Daemon. Therefore, the task should fail if an architecture field is set to ia64.
-        if (configuration.architecture == Architecture.IA64) {
+        if (configuration.architecture.getOrNull() == Architecture.IA64) {
             throw new GradleException("Intel Itanium 64-bit architecture (ia64) is not supported. " +
                     "Please use either x86 architecture (x86) or AMD/EMT 64-bit architecture (amd64).")
         }
@@ -80,7 +69,7 @@ class WindowsServicePluginTask extends DefaultTask {
         copyAllDependencies(libraryDirectory)
 
         // Copy apache commons daemon exe files to the output directory.
-        extractCommonsDaemonBinaries(outputDirectory)
+        extractCommonsDaemonBinaries(outputDirectory, configuration)
 
         // Create batch files.
         new InstallScriptGenerator(project.name, classpath, configuration, outputDirectory).generate()
@@ -100,7 +89,7 @@ class WindowsServicePluginTask extends DefaultTask {
     /**
      * Extracts apache commons daemon service executables into output directory.
      */
-    def extractCommonsDaemonBinaries(File outputDirectory) {
+    def extractCommonsDaemonBinaries(File outputDirectory, WindowsServicePluginConfiguration configuration) {
         // Check if apache commons daemon windows binaries archive is available.
         def commonsDaemonBinariesZip = project.configurations.getByName(WindowsServicePlugin.COMMONS_DAEMON_BIN_CONFIGURATION_NAME)
                 .find { File file -> file.name =~ /commons-daemon-.+-bin-windows\.zip/ }
@@ -109,7 +98,7 @@ class WindowsServicePluginTask extends DefaultTask {
         }
 
         // Prepare FileCollection containing service binaries.
-        def architecture = configuration.architecture
+        def architecture = configuration.architecture.getOrNull()
         def commonsDaemonBinaries = project.zipTree(commonsDaemonBinariesZip).matching {
             include 'prunmgr.exe'
             switch (architecture) {
@@ -121,6 +110,8 @@ class WindowsServicePluginTask extends DefaultTask {
                     break
             }
         }.files
+
+        println commonsDaemonBinaries
 
         // Copy service binaries to output directory.
         project.copy {

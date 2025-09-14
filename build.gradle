@@ -1,33 +1,21 @@
-buildscript {
-    repositories {
-        maven {
-            url "https://plugins.gradle.org/m2/"
-        }
-    }
-    dependencies {
-        classpath "com.gradle.publish:plugin-publish-plugin:0.9.7"
-    }
-}
-
 plugins {
-    id 'com.gradle.plugin-publish' version '0.9.7'
     id 'groovy'
     id 'java-gradle-plugin'
 }
 
 repositories {
-    jcenter()
+    mavenCentral()
 }
 
 group 'com.github.alexeylisyutenko'
 version '1.1.0'
 
 dependencies {
-    testCompile group: 'junit', name: 'junit', version: '4.12'
-    testCompile ('org.spockframework:spock-core:1.0-groovy-2.4') {
+    testImplementation group: 'junit', name: 'junit', version: '4.12'
+    testImplementation ('org.spockframework:spock-core:2.3-groovy-3.0') {
         exclude module : 'groovy-all'
     }
-    testCompile 'commons-io:commons-io:2.5'
+    testImplementation 'commons-io:commons-io:2.5'
 }
 
 gradlePlugin {
@@ -35,20 +23,6 @@ gradlePlugin {
         windowsServicePlugin {
             id = "com.github.alexeylisyutenko.windows-service-plugin"
             implementationClass = "com.github.alexeylisyutenko.windowsserviceplugin.WindowsServicePlugin"
-        }
-    }
-}
-
-pluginBundle {
-    website = 'https://github.com/alexeylisyutenko/windows-service-plugin'
-    vcsUrl = 'https://github.com/alexeylisyutenko/windows-service-plugin'
-    description = 'Gradle plugin for wrapping java application as a windows service'
-    tags = ['windows', 'service', 'apache', 'commons', 'procrun', 'wrapper']
-
-    plugins {
-        windowsServicePlugin {
-            id = "com.github.alexeylisyutenko.windows-service-plugin"
-            displayName = 'Windows service plugin'
         }
     }
 }
